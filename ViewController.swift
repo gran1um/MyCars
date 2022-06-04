@@ -5,6 +5,7 @@ import CoreData
 class ViewController: UIViewController {
     
     var context: NSManagedObjectContext!
+    var car: Car!
     lazy var dateFormatter: DateFormatter = {
         let df = DateFormatter()
         df.dateStyle = .short
@@ -13,7 +14,18 @@ class ViewController: UIViewController {
         return df
     }()
     
-    @IBOutlet weak var segmentedControl: UISegmentedControl!
+    @IBOutlet weak var segmentedControl: UISegmentedControl! {
+        didSet{
+            updateSegmentedControl()
+            segmentedControl.selectedSegmentTintColor = .white
+            
+            let whiteTitleTextAttributes = [NSAttributedString.Key.foregroundColor: UIColor.white]
+            let blackTitleTextAttributes = [NSAttributedString.Key.foregroundColor: UIColor.black]
+            
+            UISegmentedControl.appearance().setTitleTextAttributes(whiteTitleTextAttributes, for: .normal)
+            UISegmentedControl.appearance().setTitleTextAttributes(blackTitleTextAttributes, for: .selected)
+        }
+    }
     @IBOutlet weak var markLabel: UILabel!
     @IBOutlet weak var modelLabel: UILabel!
     @IBOutlet weak var carImageView: UIImageView!
@@ -23,15 +35,69 @@ class ViewController: UIViewController {
     @IBOutlet weak var myChoiceImageView: UIImageView!
     
     @IBAction func segmentedCtrlPressed(_ sender: UISegmentedControl) {
-        
+        updateSegmentedControl()
     }
     
     @IBAction func startEnginePressed(_ sender: UIButton) {
+        car.timesDriven += 1
+        car.lastStarted = Date()
         
+        do{
+            try context.save()
+            insertDataFrom(selectedCar: car)
+        }
+        catch let error as NSError{
+            print(error.localizedDescription)
+        }
     }
     
     @IBAction func rateItPressed(_ sender: UIButton) {
+        let alertController = UIAlertController(title: "Rate it", message: "Rate this car please", preferredStyle: .alert)
+        let rateAction = UIAlertAction(title: "Rate", style: .default) {
+            action in
+            if let text = alertController.textFields?.first?.text {
+                self.update(rating: (text as NSString).doubleValue)
+            }
+        }
+        let cancelAction = UIAlertAction(title: "Cancel", style: .default)
+        alertController.addTextField{textField in
+            textField.keyboardType = .numberPad
+        }
         
+        alertController.addAction(rateAction)
+        alertController.addAction(cancelAction)
+        present(alertController, animated: true, completion: nil)
+    }
+    
+    private func updateSegmentedControl(){
+        let fetchRequest: NSFetchRequest<Car> = Car.fetchRequest()
+        let mark = segmentedControl.titleForSegment(at: segmentedControl.selectedSegmentIndex)
+        fetchRequest.predicate = NSPredicate(format: "mark == %@", mark!)
+        
+        do {
+            let results = try context.fetch(fetchRequest)
+            car = results.first
+            insertDataFrom(selectedCar: car!)
+        }
+        catch let error as NSError{
+            print(error.localizedDescription)
+        }
+    }
+    
+    private func update(rating: Double){
+        car.rating = rating
+        
+        do {
+            try context.save()
+            insertDataFrom(selectedCar: car)
+        }
+        catch let error as NSError {
+            let alertController = UIAlertController(title: "Wrong value", message: "Wrong input", preferredStyle: .alert)
+            let okAction = UIAlertAction(title: "OK", style: .default)
+            alertController.addAction(okAction)
+            present(alertController, animated: true, completion: nil)
+            print(error.localizedDescription)
+        }
     }
     
     private func insertDataFrom(selectedCar car: Car){
@@ -43,7 +109,7 @@ class ViewController: UIViewController {
         numberOfTripsLabel.text = "Number of trips: \(car.timesDriven)"
         
         lastTimeStartedLabel.text = "Last time started: \(dateFormatter.string(from: car.lastStarted!))"
-        segmentedControl.tintColor = car.tintColor as? UIColor
+        segmentedControl.backgroundColor = car.tintColor as? UIColor
     }
     
     private func getDataFromFile(){
@@ -100,21 +166,8 @@ class ViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Do any additional setup after loading the view, typically from a nib.
         getDataFromFile()
         
-        let fetchRequest: NSFetchRequest<Car> = Car.fetchRequest()
-        let mark = segmentedControl.titleForSegment(at: 0)
-        fetchRequest.predicate = NSPredicate(format: "mark == %@", mark!)
-        
-        do {
-            let results = try context.fetch(fetchRequest)
-            let car = results.first
-            insertDataFrom(selectedCar: car!)
-        }
-        catch let error as NSError{
-            print(error.localizedDescription)
-        }
     }
     
 }
